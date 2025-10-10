@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GoogleFormsClone.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/response")]
 public class ResponseController : ControllerBase
 {
     private readonly ResponseService _responseService;
@@ -15,7 +15,6 @@ public class ResponseController : ControllerBase
         _responseService = responseService;
     }
 
-    // GET: api/Response
     [HttpGet]
     public async Task<IActionResult> GetAllResponses()
     {
@@ -23,7 +22,6 @@ public class ResponseController : ControllerBase
         return Ok(responses);
     }
 
-    // GET: api/Response/{id}
     [HttpGet("{id}")]
     public async Task<IActionResult> GetResponseById(string id)
     {
@@ -34,7 +32,6 @@ public class ResponseController : ControllerBase
         return Ok(response);
     }
 
-    // GET: api/Response/form/{formId}
     [HttpGet("form/{formId}")]
     public async Task<IActionResult> GetResponsesByFormId(string formId)
     {
@@ -42,7 +39,6 @@ public class ResponseController : ControllerBase
         return Ok(responses);
     }
 
-    // POST: api/Response
     [HttpPost]
     public async Task<IActionResult> CreateResponse([FromBody] Response response)
     {
@@ -53,7 +49,6 @@ public class ResponseController : ControllerBase
         return CreatedAtAction(nameof(GetResponseById), new { id = created.Id }, created);
     }
 
-    // PUT: api/Response/{id}
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateResponse(string id, [FromBody] Response response)
     {
@@ -67,7 +62,6 @@ public class ResponseController : ControllerBase
         return Ok(response);
     }
 
-    // DELETE: api/Response/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteResponse(string id)
     {

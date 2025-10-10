@@ -12,7 +12,6 @@ public class FileService
         _files = db.GetCollection<FileResource>("Files");
     }
 
-    // --- Basic CRUD ---
     public async Task<List<FileResource>> GetAllFilesAsync()
     {
         return await _files.Find(f => true).ToListAsync();
@@ -44,7 +43,6 @@ public class FileService
         return result.DeletedCount > 0;
     }
 
-    // --- Filterable Methods ---
     public async Task<List<FileResource>> GetFilesByUploaderIdAsync(string userId)
     {
         return await _files.Find(f => f.UploadedBy == userId).ToListAsync();
@@ -60,7 +58,6 @@ public class FileService
         return await _files.Find(f => f.CreatedAt >= from && f.CreatedAt <= to).ToListAsync();
     }
 
-    // --- Sortable Methods ---
     public async Task<List<FileResource>> GetAllFilesSortedByFieldAsync(string sortBy = "CreatedAt", bool ascending = true)
     {
         var sortDefinition = ascending 
@@ -70,7 +67,6 @@ public class FileService
         return await _files.Find(f => true).Sort(sortDefinition).ToListAsync();
     }
 
-    // --- Aggregation Examples ---
     public async Task<List<UserFileCount>> GetFileCountPerUserAsync()
     {
         var pipeline = _files.Aggregate()
@@ -96,7 +92,6 @@ public class FileService
     }
 }
 
-// --- Aggregation Result Classes ---
 public class UserFileCount
 {
     public string UserId { get; set; } = null!;

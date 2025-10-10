@@ -22,7 +22,7 @@ public class User
     public string AvatarUrl { get; set; } = null!;
 
     [BsonElement("role")]
-    public string Role { get; set; } = "user"; // user, admin, super_admin
+    public string Role { get; set; } = "user"; // user, admin
 
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
@@ -30,7 +30,6 @@ public class User
     [BsonElement("preferences")]
     public UserPreferences Preferences { get; set; } = new();
     
-
     [BsonElement("stats")]
     public UserStats Stats { get; set; } = new();
 

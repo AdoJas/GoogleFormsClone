@@ -6,8 +6,8 @@ using GoogleFormsClone.Services;
 namespace GoogleFormsClone.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
-    [Authorize] // Require JWT for all endpoints
+    [Route("api/forms")]
+    [Authorize] 
     public class FormsController : ControllerBase
     {
         private readonly IFormService _formService;
@@ -40,9 +40,8 @@ namespace GoogleFormsClone.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Form>> CreateForm(Form form)
+        public async Task<ActionResult<Form>> CreateForm(Form form) // TODO:: FromBody take user id, now doesnt work like supposed
         {
-            // In real app, extract userId from JWT claims
             var userId = User.FindFirst("id")?.Value ?? "unknown-user";
             var createdForm = await _formService.CreateFormAsync(form, userId);
             return CreatedAtAction(nameof(GetForm), new { id = createdForm.Id }, createdForm);

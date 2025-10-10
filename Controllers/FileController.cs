@@ -6,7 +6,7 @@ using GoogleFormsClone.DTOs.File;
 namespace GoogleFormsClone.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/file")]
 public class FileController : ControllerBase
 {
     private readonly FileService _fileService;
@@ -15,9 +15,7 @@ public class FileController : ControllerBase
     {
         _fileService = fileService;
     }
-
-    // --- BASIC CRUD ------------------------------------------------
-
+    
     [HttpGet]
     public async Task<ActionResult<List<FileResourceDto>>> GetAllFiles()
     {
@@ -106,9 +104,7 @@ public class FileController : ControllerBase
         var deleted = await _fileService.DeleteFileAsync(id);
         return deleted ? NoContent() : NotFound();
     }
-
-    // --- FILTERING -------------------------------------------------
-
+    
     [HttpGet("uploader/{userId}")]
     public async Task<ActionResult<List<FileResourceDto>>> GetFilesByUploaderId(string userId)
     {
@@ -131,9 +127,7 @@ public class FileController : ControllerBase
         var files = await _fileService.GetFilesByDateRangeAsync(from, to);
         return Ok(files.Select(ToFileDto));
     }
-
-    // --- SORTING ---------------------------------------------------
-
+    
     [HttpGet("sorted")]
     public async Task<ActionResult<List<FileResourceDto>>> GetFilesSorted(
         [FromQuery] string sortBy = "CreatedAt",
@@ -142,9 +136,7 @@ public class FileController : ControllerBase
         var files = await _fileService.GetAllFilesSortedByFieldAsync(sortBy, ascending);
         return Ok(files.Select(ToFileDto));
     }
-
-    // --- AGGREGATION -----------------------------------------------
-
+    
     [HttpGet("aggregates/filecount")]
     public async Task<ActionResult<List<UserFileCount>>> GetFileCountPerUser()
     {
@@ -158,9 +150,7 @@ public class FileController : ControllerBase
         var result = await _fileService.GetTotalStorageUsedPerUserAsync();
         return Ok(result);
     }
-
-    // --- PRIVATE MAPPER --------------------------------------------
-
+    
     private static FileResourceDto ToFileDto(FileResource f)
     {
         return new FileResourceDto

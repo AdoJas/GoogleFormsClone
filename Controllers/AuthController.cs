@@ -3,11 +3,13 @@ using GoogleFormsClone.Models;
 using GoogleFormsClone.Services;
 using GoogleFormsClone.DTOs;
 using GoogleFormsClone.DTOs.Auth;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GoogleFormsClone.Controllers;
 
+[Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/auth")]
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
@@ -16,7 +18,8 @@ public class AuthController : ControllerBase
     {
         _authService = authService;
     }
-
+    
+    [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterUserDto request)
     {
@@ -30,7 +33,7 @@ public class AuthController : ControllerBase
             var user = new User
             {
                 Email = request.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                PasswordHash = request.Password, 
                 Name = string.IsNullOrWhiteSpace(request.Name) ? request.Email.Split('@')[0] : request.Name,
                 AvatarUrl = "default-avatar.png",
                 Role = "user",
@@ -41,15 +44,15 @@ public class AuthController : ControllerBase
                 UpdatedAt = DateTime.UtcNow
             };
 
-            var createdUser = await _authService.RegisterUserAsync(user);
-            return Ok(new { createdUser.Id, createdUser.Email });
+            var authResponse = await _authService.RegisterAndLoginUserAsync(user);
+
+            return Ok(authResponse); 
         }
         catch (Exception ex)
         {
             return BadRequest(new { error = ex.Message });
         }
     }
-
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto request)
     {
@@ -66,7 +69,8 @@ public class AuthController : ControllerBase
         await _authService.RevokeRefreshTokenAsync(request.RefreshToken);
         return Ok();
     }
-
+    
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] AuthRequest request)
     {

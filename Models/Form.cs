@@ -11,7 +11,6 @@ public class Form
 
     [BsonRepresentation(BsonType.ObjectId)]
     public string CreatedBy { get; set; } = string.Empty;
-
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public FormSettings Settings { get; set; } = new();
@@ -19,7 +18,7 @@ public class Form
     public AccessControl AccessControl { get; set; } = new();
     public int Version { get; set; } = 1;
     public List<Question> Questions { get; set; } = new();
-
+    
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -50,12 +49,10 @@ public class Question
 {
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
-
     public string Type { get; set; } = string.Empty;
     public string QuestionText { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public bool Required { get; set; } = false;
-
     public List<QuestionOption> Options { get; set; } = new();
     public LinearScale? LinearScale { get; set; }
     public QuestionValidation? Validation { get; set; }

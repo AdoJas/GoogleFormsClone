@@ -17,7 +17,7 @@ public class AuthService
     private readonly IMongoCollection<User> _users;
     private readonly IMongoCollection<RefreshToken> _refreshTokens;
     private readonly JwtSettings _jwtSettings;
-
+    
     public AuthService(IMongoClient client, IOptions<MongoDbSettings> dbSettings, IOptions<JwtSettings> jwtOptions)
     {
         var database = client.GetDatabase(dbSettings.Value.DatabaseName);
@@ -26,8 +26,7 @@ public class AuthService
         _jwtSettings = jwtOptions.Value;
     }
 
-    // --- REGISTER ---
-    public async Task<User> RegisterUserAsync(User user)
+    public async Task<AuthResponse> RegisterAndLoginUserAsync(User user)
     {
         var existing = await _users.Find(u => u.Email == user.Email).FirstOrDefaultAsync();
         if (existing != null)
@@ -38,20 +37,9 @@ public class AuthService
         user.UpdatedAt = DateTime.UtcNow;
 
         await _users.InsertOneAsync(user);
-        return user;
-    }
 
-    // --- LOGIN / AUTHENTICATE ---
-    public async Task<AuthResponse?> AuthenticateUserAsync(string email, string password)
-    {
-        var user = await _users.Find(u => u.Email == email && u.IsActive).FirstOrDefaultAsync();
-        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return null;
-
-        // Create access token
         var accessToken = GenerateJwtToken(user);
 
-        // Create refresh token
         var refreshToken = new RefreshToken
         {
             Token = Guid.NewGuid().ToString(),
@@ -77,7 +65,39 @@ public class AuthService
         };
     }
 
-    // --- REFRESH TOKEN ---
+    public async Task<AuthResponse?> AuthenticateUserAsync(string email, string password)
+    {
+        var user = await _users.Find(u => u.Email == email && u.IsActive).FirstOrDefaultAsync();
+        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            return null;
+
+        var accessToken = GenerateJwtToken(user);
+
+        var refreshToken = new RefreshToken
+        {
+            Token = Guid.NewGuid().ToString(),
+            UserId = user.Id,
+            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays),
+            IsActive = true
+        };
+        await _refreshTokens.InsertOneAsync(refreshToken);
+
+        return new AuthResponse
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken.Token,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationMinutes),
+            User = new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                Role = user.Role,
+                AvatarUrl = user.AvatarUrl
+            }
+        };
+    }
+
     public async Task<AuthResponse?> RefreshTokenAsync(string token)
     {
         var existingToken = await _refreshTokens.Find(rt => rt.Token == token && rt.IsActive)
@@ -89,11 +109,9 @@ public class AuthService
         if (user == null)
             return null;
 
-        // Deactivate old token
         existingToken.IsActive = false;
         await _refreshTokens.ReplaceOneAsync(rt => rt.Id == existingToken.Id, existingToken);
 
-        // Generate new tokens
         var accessToken = GenerateJwtToken(user);
         var refreshToken = new RefreshToken
         {
@@ -120,7 +138,6 @@ public class AuthService
         };
     }
 
-    // --- REVOKE REFRESH TOKEN ---
     public async Task<bool> RevokeRefreshTokenAsync(string token)
     {
         var existingToken = await _refreshTokens.Find(rt => rt.Token == token && rt.IsActive)
@@ -133,7 +150,6 @@ public class AuthService
         return result.ModifiedCount > 0;
     }
 
-    // --- HELPER: Generate JWT ---
     private string GenerateJwtToken(User user)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -161,7 +177,6 @@ public class AuthService
     }
 }
 
-// --- Refresh Token Model ---
 public class RefreshToken
 {
     [BsonId]
