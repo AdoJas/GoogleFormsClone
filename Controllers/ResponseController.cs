@@ -23,10 +23,20 @@ public class ResponseController : ControllerBase
         _formService = formService;
     }
 
-    [HttpGet]
-    public async Task<IActionResult> GetAllResponses()
+    [HttpGet("{formId}/responses")]
+    public async Task<IActionResult> GetResponsesByForm(string formId)
     {
-        var responses = await _responseService.GetAllResponsesAsync();
+        var form = await _formService.GetFormAsync(formId);
+        if (form == null)
+            return NotFound("Form not found");
+
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+        if (currentUserRole != "Admin" && form.CreatedBy != currentUserId)
+            return Forbid("You are not allowed to view these responses");
+
+        var responses = await _responseService.GetByResponseFormIdAsync(formId);
         return Ok(responses);
     }
 
@@ -36,15 +46,17 @@ public class ResponseController : ControllerBase
         var response = await _responseService.GetResponseByIdAsync(id);
         if (response == null)
             return NotFound(new { error = "Response not found." });
+        
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+        var form = await _formService.GetFormAsync(response.FormId);
+        var formOwnerId = form?.CreatedBy;
+
+        if (currentUserRole != "Admin" && currentUserId != response.SubmittedBy && currentUserId != formOwnerId)
+            return Forbid("You are not allowed to view this response.");
 
         return Ok(response);
-    }
-
-    [HttpGet("form/{formId}")]
-    public async Task<IActionResult> GetResponsesByFormId(string formId)
-    {
-        var responses = await _responseService.GetByResponseFormIdAsync(formId);
-        return Ok(responses);
     }
 
     [HttpPost]
@@ -69,10 +81,10 @@ public class ResponseController : ControllerBase
         }
 
         foreach (var answer in dto.Answers)
-            {
-                var question = form.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
-                if (question == null)
-                    return BadRequest($"Question {answer.QuestionId} does not exist.");
+        {
+            var question = form.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
+            if (question == null)
+                return BadRequest($"Question {answer.QuestionId} does not exist.");
 
             switch (question.Type)
             {
@@ -120,7 +132,7 @@ public class ResponseController : ControllerBase
                 case "linear-scale":
                     if (question.Required && !answer.LinearScaleValue.HasValue)
                         return BadRequest($"Linear scale value required for question {question.Id}.");
-                    if (answer.LinearScaleValue.HasValue &&  question.LinearScale != null
+                    if (answer.LinearScaleValue.HasValue && question.LinearScale != null
                         && (answer.LinearScaleValue < question.LinearScale.MinValue || answer.LinearScaleValue > question.LinearScale.MaxValue))
                         return BadRequest($"Linear scale value out of range for question {question.Id}.");
                     break;
@@ -130,8 +142,12 @@ public class ResponseController : ControllerBase
                     break;
                 default:
                     return BadRequest($"Unsupported question type {question.Type} for question {question.Id}.");
-                }
             }
+        }
+            if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized("User ID not found.");
+                }
 
             var response = ResponseMapper.ToModel(dto, userId);
             var created = await _responseService.CreateResponseAsync(response);

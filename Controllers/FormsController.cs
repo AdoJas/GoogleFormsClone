@@ -41,6 +41,12 @@ public class FormsController : ControllerBase
     [HttpGet("user/{userId}")]
     public async Task<ActionResult<List<Form>>> GetUserForms(string userId)
     {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+        if (currentUserRole != "Admin" && currentUserId != userId)
+            return Forbid("You are not allowed to access this user's forms.");
+
         if (string.IsNullOrEmpty(userId))
             return BadRequest("User ID not found");
 
@@ -89,9 +95,18 @@ public class FormsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteForm(string id)
     {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+        var form = await _formService.GetFormAsync(id);
+        if (form == null)
+            return NotFound();
+
+        if (currentUserRole != "Admin" && form.CreatedBy != currentUserId)
+            return Forbid("You are not allowed to delete this form.");
+
         var deleted = await _formService.DeleteFormAsync(id);
         return deleted ? NoContent() : NotFound();
     }
-
 }
 
