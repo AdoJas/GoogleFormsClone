@@ -68,7 +68,7 @@ public class UserController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "admin,super_admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> GetUser(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -82,7 +82,7 @@ public class UserController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "admin,super_admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> UpdateUser(string id, [FromBody] UserUpdateDto request)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -96,7 +96,7 @@ public class UserController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "admin,super_admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteUserAndData(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -109,7 +109,7 @@ public class UserController : ControllerBase
         return NoContent();
     }
     [HttpGet]
-    [Authorize(Roles = "admin,super_admin")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> GetAllUsers()
     {
         var users = await _userService.GetAllUsersAsync();
