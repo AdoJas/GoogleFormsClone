@@ -5,6 +5,9 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using GoogleFormsClone.Models;
 using GoogleFormsClone.Services;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
