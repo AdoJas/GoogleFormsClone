@@ -2,11 +2,15 @@
 using GoogleFormsClone.Models;
 using GoogleFormsClone.Services;
 using GoogleFormsClone.DTOs.File;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+
 
 namespace GoogleFormsClone.Controllers;
 
 [ApiController]
 [Route("api/file")]
+[Authorize]
 public class FileController : ControllerBase
 {
     private readonly FileService _fileService;
@@ -16,27 +20,15 @@ public class FileController : ControllerBase
         _fileService = fileService;
     }
     
-    [HttpGet]
-    public async Task<ActionResult<List<FileResourceDto>>> GetAllFiles()
-    {
-        var files = await _fileService.GetAllFilesAsync();
-
-        var fileDtos = files.Select(f => new FileResourceDto
-        {
-            Id = f.Id,
-            OriginalName = f.OriginalName,
-            FileType = f.FileType,
-            FileSize = f.FileSize,
-            UploadUrl = f.UploadUrl
-        }).ToList();
-
-        return Ok(fileDtos);
-    }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<FileResourceDto>> GetFileById(string id)
     {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
         var file = await _fileService.GetFileByIdAsync(id);
+        
         if (file == null)
             return NotFound();
 
@@ -48,6 +40,8 @@ public class FileController : ControllerBase
             FileSize = file.FileSize,
             UploadUrl = file.UploadUrl
         };
+        if (currentUserRole != "Admin" && file.UploadedBy != currentUserId)
+            return Forbid("You are not allowed to access this file.");
 
         return Ok(dto);
     }
