@@ -1,6 +1,0 @@
-@GoogleFormsClone_HostAddress = http://localhost:5057
-
-GET {{GoogleFormsClone_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
