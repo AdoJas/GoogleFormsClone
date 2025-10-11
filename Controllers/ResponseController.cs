@@ -67,11 +67,9 @@ public class ResponsesController : ControllerBase
         if (!form.IsActive)
             return BadRequest("This form is no longer accepting responses");
 
-        // Check if login is required
         if (form.Settings.RequireLogin && !User.Identity.IsAuthenticated)
             return Unauthorized("You must be logged in to submit this form");
 
-        // Collect metadata
         var metadata = new ResponseMetadata
         {
             IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "",
