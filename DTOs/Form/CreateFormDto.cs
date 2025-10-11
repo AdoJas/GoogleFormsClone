@@ -13,6 +13,7 @@ public class QuestionDto
     public string? Description { get; set; }
     public string Type { get; set; } = string.Empty;
     public bool Required { get; set; } = false;
+    public bool AllowMultipleSelection { get; set; }
     public List<OptionDto>? Options { get; set; }
     public bool OneChoice { get; set; } = false;
     public LinearScaleDto? LinearScale { get; set; }

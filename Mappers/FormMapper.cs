@@ -19,6 +19,7 @@ public static class FormMapper
                 Type = q.Type,
                 Required = q.Required,
                 OrderIndex = index,
+                AllowMultipleSelection = q.AllowMultipleSelection,
                 Options = q.Options?.Select((o, i) => new QuestionOption
                 {
                     Text = o.Text,
