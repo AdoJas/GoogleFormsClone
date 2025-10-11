@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GoogleFormsClone")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cb93179ed45a23f0f25e14ef01fe1627551a3dfc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dc778576bc6956079aeb230c827f2d86ad9804f5")]
 [assembly: System.Reflection.AssemblyProductAttribute("GoogleFormsClone")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GoogleFormsClone")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
