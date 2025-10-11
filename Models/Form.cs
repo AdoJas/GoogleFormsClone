@@ -48,9 +48,6 @@ public class FormSettings
     [BsonElement("allowEditing")]
     public bool AllowEditing { get; set; } = false;
 
-    [BsonElement("requireLogin")]
-    public bool RequireLogin { get; set; } = false;
-
     [BsonElement("oneResponsePerUser")]
     public bool OneResponsePerUser { get; set; } = false;
 
@@ -99,6 +96,9 @@ public class Question
 
     [BsonElement("required")]
     public bool Required { get; set; } = false;
+
+    [BsonElement("allowMultipleSelection")]
+    public bool AllowMultipleSelection { get; set; } = true;
 
     [BsonElement("options")]
     public List<QuestionOption> Options { get; set; } = new();

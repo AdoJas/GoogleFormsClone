@@ -22,6 +22,7 @@ public class FormsController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<Form>>> GetForms()
     {
         var forms = await _formService.GetAllFormsAsync();
@@ -29,6 +30,7 @@ public class FormsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<ActionResult<Form>> GetForm(string id)
     {
         var form = await _formService.GetFormAsync(id);
@@ -39,6 +41,9 @@ public class FormsController : ControllerBase
     [HttpGet("user/{userId}")]
     public async Task<ActionResult<List<Form>>> GetUserForms(string userId)
     {
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest("User ID not found");
+
         var forms = await _formService.GetUserFormsAsync(userId);
         return Ok(forms);
     }

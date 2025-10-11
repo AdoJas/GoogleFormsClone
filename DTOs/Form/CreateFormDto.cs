@@ -14,6 +14,7 @@ public class QuestionDto
     public string Type { get; set; } = string.Empty;
     public bool Required { get; set; } = false;
     public List<OptionDto>? Options { get; set; }
+    public bool OneChoice { get; set; } = false;
     public LinearScaleDto? LinearScale { get; set; }
     public ValidationDto? Validation { get; set; }
     public LogicDto? Logic { get; set; }
