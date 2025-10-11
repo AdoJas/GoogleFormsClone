@@ -61,6 +61,8 @@ artifacts/
 *.swp
 *.temp
 *.log
+bin/
+obj/
 
 # ---- NuGet ----
 *.nupkg
