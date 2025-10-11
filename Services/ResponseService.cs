@@ -1,21 +1,60 @@
-﻿using MongoDB.Driver;
-using GoogleFormsClone.Models;
-using GoogleFormsClone.Services;
+﻿using GoogleFormsClone.Models;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace GoogleFormsClone.Services;
 
 public class ResponseService
 {
     private readonly IMongoCollection<Response> _responses;
+    private readonly IMongoCollection<Form> _forms;
 
-    public ResponseService(MongoDbService db)
+    public ResponseService(MongoDbService mongoDbService)
     {
-        _responses = db.GetCollection<Response>("Responses");
+        _responses = mongoDbService.GetCollection<Response>("responses");
+        _forms = mongoDbService.GetCollection<Form>("forms");
     }
 
-    public async Task<List<Response>> GetAllResponsesAsync()
+    public async Task<Response> CreateResponseAsync(string formId, string? submittedBy, List<Answer> answers, ResponseMetadata metadata)
     {
-        return await _responses.Find(r => true).ToListAsync();
+        var form = await _forms.Find(f => f.Id == formId).FirstOrDefaultAsync();
+        
+        if (form == null)
+            throw new Exception("Form not found");
+
+        foreach (var answer in answers)
+        {
+            var question = form.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
+            if (question != null)
+            {
+                answer.QuestionSnapshot = new QuestionSnapshot
+                {
+                    QuestionText = question.QuestionText,
+                    QuestionType = question.Type,
+                    Options = question.Options
+                };
+            }
+        }
+
+        var response = new Response
+        {
+            Id = ObjectId.GenerateNewId().ToString(),
+            FormId = formId,
+            SubmittedBy = submittedBy,
+            Answers = answers,
+            Metadata = metadata,
+            SubmittedAt = DateTime.UtcNow
+        };
+
+        await _responses.InsertOneAsync(response);
+        return response;
+    }
+
+    public async Task<IEnumerable<Response>> GetResponsesByFormIdAsync(string formId)
+    {
+        return await _responses.Find(r => r.FormId == formId)
+            .SortByDescending(r => r.SubmittedAt)
+            .ToListAsync();
     }
 
     public async Task<Response?> GetResponseByIdAsync(string id)
@@ -23,30 +62,13 @@ public class ResponseService
         return await _responses.Find(r => r.Id == id).FirstOrDefaultAsync();
     }
 
-    public async Task<List<Response>> GetByResponseFormIdAsync(string formId)
+    public async Task DeleteResponseAsync(string id)
     {
-        return await _responses.Find(r => r.FormId == formId).ToListAsync();
+        await _responses.DeleteOneAsync(r => r.Id == id);
     }
 
-    public async Task<Response> CreateResponseAsync(Response response)
+    public async Task<long> GetResponseCountForFormAsync(string formId)
     {
-        response.CreatedAt = DateTime.UtcNow;
-        response.UpdatedAt = DateTime.UtcNow;
-        response.SubmittedAt = DateTime.UtcNow;
-        await _responses.InsertOneAsync(response);
-        return response;
-    }
-
-    public async Task<bool> UpdateResponseAsync(string id, Response updatedResponse)
-    {
-        updatedResponse.UpdatedAt = DateTime.UtcNow;
-        var result = await _responses.ReplaceOneAsync(r => r.Id == id, updatedResponse);
-        return result.ModifiedCount > 0;
-    }
-
-    public async Task<bool> DeleteResponseAsync(string id)
-    {
-        var result = await _responses.DeleteOneAsync(r => r.Id == id);
-        return result.DeletedCount > 0;
+        return await _responses.CountDocumentsAsync(r => r.FormId == formId);
     }
 }
