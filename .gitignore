@@ -1,0 +1,55 @@
+# =====================
+# .NET Build Folders
+# =====================
+bin/
+obj/
+out/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+
+# =====================
+# User-specific files
+# =====================
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# =====================
+# Visual Studio Code
+# =====================
+.vscode/
+.history/
+*.code-workspace
+
+# =====================
+# JetBrains Rider / IntelliJ
+# =====================
+.idea/
+*.iml
+*.iws
+
+# =====================
+# Environment & secrets
+# =====================
+appsettings.Development.json
+*.env
+
+# =====================
+# NuGet
+# =====================
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+*.nuspec
+
+# =====================
+# Others
+# =====================
+Thumbs.db
+.DS_Store
