@@ -24,6 +24,12 @@ public class AuthService
         _users = database.GetCollection<User>("Users");
         _refreshTokens = database.GetCollection<RefreshToken>("RefreshTokens");
         _jwtSettings = jwtOptions.Value;
+
+        var indexModel = new CreateIndexModel<User>(
+            Builders<User>.IndexKeys.Ascending(u => u.Email),
+            new CreateIndexOptions { Unique = true, Background = true }
+        );
+        _users.Indexes.CreateOne(indexModel);
     }
 
     public async Task<AuthResponse> RegisterAndLoginUserAsync(User user)

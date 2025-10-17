@@ -11,7 +11,6 @@ namespace GoogleFormsClone.Controllers;
 
 [ApiController]
 [Route("api/response")]
-[Authorize]
 public class ResponseController : ControllerBase
 {
     private readonly ResponseService _responseService;

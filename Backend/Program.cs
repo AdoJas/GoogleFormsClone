@@ -8,38 +8,28 @@ using GoogleFormsClone.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-//
-// ──────────────────────────────────────────────────────────────
-//  1. CONFIGURATION
-// ──────────────────────────────────────────────────────────────
-//
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDbSettings"));
 
 builder.Services.Configure<JwtSettings>(
     builder.Configuration.GetSection("JwtSettings"));
 
-//
-// ──────────────────────────────────────────────────────────────
-//  2. MONGODB CLIENT SETUP
-// ──────────────────────────────────────────────────────────────
-//
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
     var settings = sp.GetRequiredService<IOptions<MongoDbSettings>>().Value;
     return new MongoClient(settings.ConnectionString);
 });
 
-builder.Services.AddSingleton<MongoDbService>();
+builder.Services.AddSingleton<MongoDbService>(sp =>
+{
+    var client = sp.GetRequiredService<IMongoClient>();
+    var options = sp.GetRequiredService<IOptions<MongoDbSettings>>();
+    return new MongoDbService(client, options);
+});
 
-//
-// ──────────────────────────────────────────────────────────────
-//  3. JWT AUTHENTICATION SETUP
-// ──────────────────────────────────────────────────────────────
-//
+
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
 if (jwtSettings == null || string.IsNullOrEmpty(jwtSettings.SecretKey))
     throw new InvalidOperationException("JWT secret key is missing in configuration.");
@@ -64,29 +54,28 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-//
-// ──────────────────────────────────────────────────────────────
-//  4. SERVICE REGISTRATION
-// ──────────────────────────────────────────────────────────────
-//
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") 
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); 
+    });
+});
+
 builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<UserService>();
+builder.Services.AddSingleton<FileService>();
 builder.Services.AddSingleton<FormService>();
 builder.Services.AddSingleton<ResponseService>();
 builder.Services.AddSingleton<IFormService, FormService>();
-
-
-//
-// ──────────────────────────────────────────────────────────────
-//  5. CONTROLLERS + SWAGGER
-// ──────────────────────────────────────────────────────────────
-//
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // Add JWT auth button in Swagger
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
@@ -111,14 +100,10 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-//
-// ──────────────────────────────────────────────────────────────
-//  6. BUILD & MIDDLEWARE PIPELINE
-// ──────────────────────────────────────────────────────────────
-//
 var app = builder.Build();
 
-// Swagger for development
+app.UseCors("AllowFrontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -130,14 +115,9 @@ else
     app.UseSwaggerUI();
 }
 
-// HTTPS redirection (optional)
 app.UseHttpsRedirection();
-
-// Enable JWT auth
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Map controllers
 app.MapControllers();
 
 app.MapGet("/", () => Results.Redirect("/swagger"));

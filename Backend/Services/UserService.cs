@@ -1,90 +1,141 @@
 ﻿using GoogleFormsClone.Models;
-using MongoDB.Driver;
 using GoogleFormsClone.DTOs.User;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace GoogleFormsClone.Services;
 
 public class UserService
 {
     private readonly IMongoCollection<User> _users;
-    private readonly MongoDbService _db;
+    private readonly IMongoCollection<Form> _forms;
+    private readonly IMongoCollection<FileResource> _files;
+    private readonly IMongoCollection<RefreshToken> _refreshTokens;
 
     public UserService(MongoDbService db)
     {
-        _db = db;
         _users = db.GetCollection<User>("Users");
+        _forms = db.GetCollection<Form>("Forms");
+        _files = db.GetCollection<FileResource>("Files");
+        _refreshTokens = db.GetCollection<RefreshToken>("RefreshTokens");
     }
 
-    public async Task<List<User>> GetAllUsersAsync() =>
-        await _users.Find(_ => true).ToListAsync();
+    // ---------------- GET ALL USERS ----------------
+    public async Task<List<UserDto>> GetAllUsersAsync()
+    {
+        var users = await _users.Find(_ => true).ToListAsync();
+        return users.Select(u => MapToUserDto(u)).ToList();
+    }
 
-    public async Task<User?> GetUserByIdAsync(string id) =>
-        await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+    // ---------------- GET USER BY ID ----------------
+    public async Task<UserDto?> GetUserByIdAsync(string id)
+    {
+        var user = await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+        if (user == null) return null;
+        return MapToUserDto(user);
+    }
 
-    public async Task<User> CreateUserAsync(User user)
+    // ---------------- CREATE USER ----------------
+    public async Task<UserDto> CreateUserAsync(User user)
     {
         user.CreatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
         await _users.InsertOneAsync(user);
-        return user;
+        return MapToUserDto(user);
     }
 
-    public async Task<User?> UpdateUserAsync(string id, UserUpdateDto dto)
+    // ---------------- UPDATE USER ----------------
+    public async Task<UserDto?> UpdateUserAsync(string id, UpdateUserDto dto)
     {
+        var user = await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+        if (user == null) return null;
+
+        var updateDefs = new List<UpdateDefinition<User>>();
         var update = Builders<User>.Update;
-        var updates = new List<UpdateDefinition<User>>();
 
         if (!string.IsNullOrWhiteSpace(dto.Name))
-            updates.Add(update.Set(u => u.Name, dto.Name));
+            updateDefs.Add(update.Set(u => u.Name, dto.Name));
 
-        if (!string.IsNullOrWhiteSpace(dto.AvatarUrl))
-            updates.Add(update.Set(u => u.AvatarUrl, dto.AvatarUrl));
+        if (dto.AvatarUrl != null)
+            updateDefs.Add(update.Set(u => u.AvatarUrl, dto.AvatarUrl));
 
         if (dto.Preferences != null)
         {
             if (dto.Preferences.EmailNotifications.HasValue)
-                updates.Add(update.Set(u => u.Preferences.EmailNotifications, dto.Preferences.EmailNotifications.Value));
+                updateDefs.Add(update.Set(u => u.Preferences.EmailNotifications, dto.Preferences.EmailNotifications.Value));
 
             if (!string.IsNullOrWhiteSpace(dto.Preferences.Theme))
-                updates.Add(update.Set(u => u.Preferences.Theme, dto.Preferences.Theme));
+                updateDefs.Add(update.Set(u => u.Preferences.Theme, dto.Preferences.Theme));
 
             if (!string.IsNullOrWhiteSpace(dto.Preferences.Language))
-                updates.Add(update.Set(u => u.Preferences.Language, dto.Preferences.Language));
+                updateDefs.Add(update.Set(u => u.Preferences.Language, dto.Preferences.Language));
         }
 
-        updates.Add(update.Set(u => u.UpdatedAt, DateTime.UtcNow));
+        updateDefs.Add(update.Set(u => u.UpdatedAt, DateTime.UtcNow));
 
-        var combinedUpdate = update.Combine(updates);
+        var combinedUpdate = update.Combine(updateDefs);
 
-        var result = await _users.FindOneAndUpdateAsync(u => u.Id == id, combinedUpdate, new FindOneAndUpdateOptions<User>
-        {
-            ReturnDocument = ReturnDocument.After
-        });
+        var updatedUser = await _users.FindOneAndUpdateAsync(
+            u => u.Id == id,
+            combinedUpdate,
+            new FindOneAndUpdateOptions<User>
+            {
+                ReturnDocument = ReturnDocument.After
+            }
+        );
 
-        return result;
+        if (updatedUser == null) return null;
+
+        var dtoResult = MapToUserDto(updatedUser);
+        dtoResult.Stats = MapToUserStatsDto(updatedUser.Stats);
+
+        return dtoResult;
     }
-    
+
+    // ---------------- DELETE USER AND ASSOCIATED DATA ----------------
     public async Task<bool> DeleteUserAndDataAsync(string userId)
     {
-        var formsCollection = _db.GetCollection<Form>("Forms");
-        var userForms = await formsCollection.Find(f => f.CreatedBy == userId).ToListAsync();
-
-        var filesCollection = _db.GetCollection<FileResource>("Files");
+        var userForms = await _forms.Find(f => f.CreatedBy == userId).ToListAsync();
         foreach (var form in userForms)
-        {
-            await filesCollection.DeleteManyAsync(f => f.AssociatedWith == form.Id);
-        }
+            await _files.DeleteManyAsync(f => f.AssociatedWith == form.Id);
 
-        await formsCollection.DeleteManyAsync(f => f.CreatedBy == userId);
-
-        await filesCollection.DeleteManyAsync(f => f.UploadedBy == userId);
-
-        var refreshTokensCol = _db.GetCollection<RefreshToken>("RefreshTokens");
-        await refreshTokensCol.DeleteManyAsync(rt => rt.UserId == userId);
+        await _forms.DeleteManyAsync(f => f.CreatedBy == userId);
+        await _files.DeleteManyAsync(f => f.UploadedBy == userId);
+        await _refreshTokens.DeleteManyAsync(rt => rt.UserId == userId);
 
         var result = await _users.DeleteOneAsync(u => u.Id == userId);
-
         return result.DeletedCount > 0;
     }
 
+    // ---------------- MAP TO DTO ----------------
+    private static UserDto MapToUserDto(User user)
+    {
+        return new UserDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            Name = user.Name,
+            Role = user.Role,
+            AvatarUrl = user.AvatarUrl,
+            Preferences = user.Preferences != null
+                ? new UserPreferencesDto
+                {
+                    EmailNotifications = user.Preferences.EmailNotifications,
+                    Theme = user.Preferences.Theme,
+                    Language = user.Preferences.Language
+                }
+                : null,
+            CreatedAt = user.CreatedAt
+        };
+    }
+    private static UserStatsDto MapToUserStatsDto(UserStats stats)
+    {
+        if (stats == null) return new UserStatsDto();
+        return new UserStatsDto
+        {
+            TotalForms = stats.FormsCreated,
+            TotalFiles = stats.ResponsesReceived,
+            TotalFileSize = stats.TotalStorageUsed
+        };
+    }
 }

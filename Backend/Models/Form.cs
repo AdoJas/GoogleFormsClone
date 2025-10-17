@@ -7,11 +7,11 @@ public class Form
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; set; } = null!;
 
     [BsonElement("createdBy")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string CreatedBy { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = null!;
 
     [BsonElement("title")]
     public string Title { get; set; } = string.Empty;
@@ -83,7 +83,7 @@ public class Question
 {
     [BsonElement("id")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+    public string Id { get; set; } = null!;
 
     [BsonElement("type")]
     public string Type { get; set; } = string.Empty;
@@ -180,7 +180,7 @@ public class QuestionLogic
 {
     [BsonElement("dependsOn")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string? DependsOn { get; set; }
+    public string DependsOn { get; set; } = null!;
 
     [BsonElement("condition")]
     public string Condition { get; set; } = string.Empty;

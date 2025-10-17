@@ -1,159 +1,158 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using GoogleFormsClone.Models;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using GoogleFormsClone.Services;
 using GoogleFormsClone.DTOs.File;
-using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
-
+using System.IdentityModel.Tokens.Jwt;
 
 namespace GoogleFormsClone.Controllers;
 
 [ApiController]
-[Route("api/file")]
+[Route("api/files")]
 [Authorize]
 public class FileController : ControllerBase
 {
     private readonly FileService _fileService;
+    private readonly UserService _userService;
 
-    public FileController(FileService fileService)
+    public FileController(FileService fileService, UserService userService)
     {
         _fileService = fileService;
+        _userService = userService;
     }
-    
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<FileResourceDto>> GetFileById(string id)
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadFile([FromForm] UploadFileRequest request)
     {
-        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+        if (request.File == null || request.File.Length == 0)
+            return BadRequest("File is missing.");
 
+        var currentUserId = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+            return Unauthorized();
+
+        try
+        {
+            using var stream = request.File.OpenReadStream();
+
+            var fileId = await _fileService.UploadFileAsync(
+                stream,
+                request.File.FileName,
+                request.File.ContentType,
+                currentUserId,
+                request.AssociatedWith,
+                request.AssociatedEntityType
+            );
+
+            return Ok(new { fileId });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"File upload failed: {ex}");
+            return StatusCode(500, "An error occurred while uploading the file.");
+        }
+    }
+
+    // -------------------
+    // Download a file
+    // -------------------
+    [HttpGet("{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DownloadFile(string id)
+    {
         var file = await _fileService.GetFileByIdAsync(id);
-        
         if (file == null)
             return NotFound();
 
-        var dto = new FileResourceDto
+        try
         {
-            Id = file.Id,
-            OriginalName = file.OriginalName,
-            FileType = file.FileType,
-            FileSize = file.FileSize,
-            UploadUrl = file.UploadUrl
-        };
-        if (currentUserRole != "Admin" && file.UploadedBy != currentUserId)
-            return Forbid("You are not allowed to access this file.");
+            var stream = await _fileService.DownloadFileAsync(id);
+            if (stream == null)
+                return NotFound();
 
-        return Ok(dto);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<FileResourceDto>> CreateFile([FromBody] CreateFileDto createDto)
-    {
-        var newFile = new FileResource
+            return new FileStreamResult(stream, file.FileType ?? "application/octet-stream")
+            {
+                FileDownloadName = file.OriginalName ?? "file",
+                EnableRangeProcessing = true
+            };
+        }
+        catch (Exception ex)
         {
-            OriginalName = createDto.OriginalName,
-            FileType = createDto.FileType,
-            FileSize = createDto.FileSize,
-            UploadUrl = createDto.UploadUrl,
-            UploadedBy = createDto.UploadedBy,
-            AssociatedWith = createDto.AssociatedWith,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        await _fileService.CreateFileAsync(newFile);
-
-        var dto = new FileResourceDto
-        {
-            Id = newFile.Id,
-            OriginalName = newFile.OriginalName,
-            FileType = newFile.FileType,
-            FileSize = newFile.FileSize,
-            UploadUrl = newFile.UploadUrl
-        };
-
-        return CreatedAtAction(nameof(GetFileById), new { id = newFile.Id }, dto);
+            Console.WriteLine($"Failed to download file {id}: {ex}");
+            return StatusCode(500, "File download failed");
+        }
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateFile(string id, [FromBody] UpdateFileDto updateDto)
-    {
-        var existingFile = await _fileService.GetFileByIdAsync(id);
-        if (existingFile == null)
-            return NotFound();
-
-        if (updateDto.OriginalName != null) existingFile.OriginalName = updateDto.OriginalName;
-        if (updateDto.FileType != null) existingFile.FileType = updateDto.FileType;
-        if (updateDto.FileSize.HasValue) existingFile.FileSize = updateDto.FileSize.Value;
-        if (updateDto.UploadUrl != null) existingFile.UploadUrl = updateDto.UploadUrl;
-        if (updateDto.AssociatedWith != null) existingFile.AssociatedWith = updateDto.AssociatedWith;
-
-        var updated = await _fileService.UpdateFileAsync(id, existingFile);
-        return updated ? NoContent() : StatusCode(500, "Failed to update file");
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteFile(string id)
-    {
-        var deleted = await _fileService.DeleteFileAsync(id);
-        return deleted ? NoContent() : NotFound();
-    }
-    
+    // -------------------
+    // List files by uploader
+    // -------------------
     [HttpGet("uploader/{userId}")]
-    public async Task<ActionResult<List<FileResourceDto>>> GetFilesByUploaderId(string userId)
+    public async Task<IActionResult> GetFilesByUploader(string userId)
     {
         var files = await _fileService.GetFilesByUploaderIdAsync(userId);
-        return Ok(files.Select(ToFileDto));
+        return Ok(files);
     }
 
-    [HttpGet("associated/{associatedId}")]
-    public async Task<ActionResult<List<FileResourceDto>>> GetFilesByAssociatedEntityId(string associatedId)
+    // -------------------
+    // List files by associated entity
+    // -------------------
+    [HttpGet("associated")]
+    public async Task<IActionResult> GetFilesByAssociatedEntity([FromQuery] string associatedId, [FromQuery] string associatedEntityType)
     {
-        var files = await _fileService.GetFilesByAssociatedEntityIdAsync(associatedId);
-        return Ok(files.Select(ToFileDto));
+        if (string.IsNullOrEmpty(associatedId) || string.IsNullOrEmpty(associatedEntityType))
+            return BadRequest("Both associatedId and associatedEntityType are required.");
+
+        var files = await _fileService.GetFilesByAssociatedEntityAsync(associatedId, associatedEntityType);
+        return Ok(files);
     }
 
-    [HttpGet("daterange")]
-    public async Task<ActionResult<List<FileResourceDto>>> GetFilesByDateRange(
-        [FromQuery] DateTime from,
-        [FromQuery] DateTime to)
-    {
-        var files = await _fileService.GetFilesByDateRangeAsync(from, to);
-        return Ok(files.Select(ToFileDto));
-    }
-    
-    [HttpGet("sorted")]
-    public async Task<ActionResult<List<FileResourceDto>>> GetFilesSorted(
-        [FromQuery] string sortBy = "CreatedAt",
-        [FromQuery] bool ascending = true)
-    {
-        var files = await _fileService.GetAllFilesSortedByFieldAsync(sortBy, ascending);
-        return Ok(files.Select(ToFileDto));
-    }
-    
+    // -------------------
+    // Aggregates
+    // -------------------
     [HttpGet("aggregates/filecount")]
-    public async Task<ActionResult<List<UserFileCount>>> GetFileCountPerUser()
+    public async Task<IActionResult> GetFileCountPerUser()
     {
         var result = await _fileService.GetFileCountPerUserAsync();
         return Ok(result);
     }
 
     [HttpGet("aggregates/storageusage")]
-    public async Task<ActionResult<List<UserStorageUsage>>> GetTotalStorageUsedPerUser()
+    public async Task<IActionResult> GetTotalStorageUsedPerUser()
     {
         var result = await _fileService.GetTotalStorageUsedPerUserAsync();
         return Ok(result);
     }
-    
-    private static FileResourceDto ToFileDto(FileResource f)
+
+    // -------------------
+    // Update file metadata
+    // -------------------
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateFile(string id, [FromBody] UpdateFileDto dto)
     {
-        return new FileResourceDto
-        {
-            Id = f.Id,
-            OriginalName = f.OriginalName,
-            FileType = f.FileType,
-            FileSize = f.FileSize,
-            UploadUrl = f.UploadUrl
-        };
+        var file = await _fileService.GetFileByIdAsync(id);
+        if (file == null)
+            return NotFound();
+
+        if (dto.OriginalName != null) file.OriginalName = dto.OriginalName;
+        if (dto.FileType != null) file.FileType = dto.FileType;
+        if (dto.FileSize.HasValue) file.FileSize = dto.FileSize.Value;
+
+        if (dto.AssociatedWith != null) file.AssociatedWith = dto.AssociatedWith;
+        if (dto.AssociatedEntityType != null) file.AssociatedEntityType = dto.AssociatedEntityType;
+
+        var updated = await _fileService.UpdateFileAsync(id, file);
+        return updated ? NoContent() : StatusCode(500, "Failed to update file");
+    }
+
+    // -------------------
+    // Delete a file
+    // -------------------
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteFile(string id)
+    {
+        var deleted = await _fileService.DeleteFileAsync(id);
+        return deleted ? NoContent() : NotFound();
     }
 }

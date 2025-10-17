@@ -1,7 +1,6 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-
-namespace GoogleFormsClone.Models;
+using System;
 
 public class FileResource
 {
@@ -18,17 +17,17 @@ public class FileResource
     [BsonElement("fileSize")]
     public long FileSize { get; set; } = 0;
 
-    [BsonElement("uploadUrl")]
-    public string UploadUrl { get; set; } = string.Empty;
-
     [BsonRepresentation(BsonType.ObjectId)]
     [BsonElement("uploadedBy")]
     public string UploadedBy { get; set; } = string.Empty;
 
     [BsonRepresentation(BsonType.ObjectId)]
     [BsonElement("associatedWith")]
-    public string AssociatedWith { get; set; } = string.Empty;
+    public string? AssociatedWith { get; set; } // Entity ID
 
+    [BsonElement("associatedEntityType")]
+    [BsonIgnoreIfNull]
+    public string? AssociatedEntityType { get; set; } // "Form", "Question", "User" for assigning in frontend
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
@@ -40,3 +39,4 @@ public class FileResource
     [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+

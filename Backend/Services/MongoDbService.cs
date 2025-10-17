@@ -2,26 +2,27 @@
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
-namespace GoogleFormsClone.Services;
-
-public sealed class MongoDbService
+namespace GoogleFormsClone.Services
 {
-    private readonly IMongoDatabase _database;
-
-    public MongoDbService(IOptions<MongoDbSettings> options)
+    public sealed class MongoDbService
     {
-        if (options?.Value == null) 
-            throw new ArgumentNullException(nameof(options), "MongoDbSettings is not configured.");
+        private readonly IMongoDatabase _database;
 
-        var client = new MongoClient(options.Value.ConnectionString);
-        _database = client.GetDatabase(options.Value.DatabaseName);
-    }
+        public MongoDbService(IMongoClient client, IOptions<MongoDbSettings> options)
+        {
+            if (options?.Value == null)
+                throw new ArgumentNullException(nameof(options));
+            _database = client.GetDatabase(options.Value.DatabaseName);
+        }
 
-    public IMongoCollection<T> GetCollection<T>(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Collection name cannot be null or empty.", nameof(name));
+        public IMongoDatabase Database => _database;
 
-        return _database.GetCollection<T>(name);
+        public IMongoCollection<T> GetCollection<T>(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Collection name cannot be null or empty.", nameof(name));
+
+            return _database.GetCollection<T>(name);
+        }
     }
 }

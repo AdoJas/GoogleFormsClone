@@ -1,33 +1,102 @@
-﻿using GoogleFormsClone.Models;
+﻿using GoogleFormsClone.DTOs.File;
+using GoogleFormsClone.Models;
 using MongoDB.Driver;
+using MongoDB.Driver.GridFS;
+using MongoDB.Bson;
 
 namespace GoogleFormsClone.Services;
 
 public class FileService
 {
     private readonly IMongoCollection<FileResource> _files;
+    private readonly GridFSBucket _gridFS;
+	private readonly UserService _userService;
 
-    public FileService(MongoDbService db)
+    public FileService(MongoDbService db, UserService userService)
     {
         _files = db.GetCollection<FileResource>("Files");
+        _gridFS = new GridFSBucket(db.Database, new GridFSBucketOptions
+        {
+            BucketName = "fileUploads",
+            ChunkSizeBytes = 1048576,
+            WriteConcern = WriteConcern.WMajority,
+            ReadPreference = ReadPreference.Primary
+        });
+		_userService = userService;
     }
 
-    public async Task<List<FileResource>> GetAllFilesAsync()
+    // ---------------- Upload/Download ----------------
+    public async Task<string> UploadFileAsync(
+        Stream fileStream, 
+        string fileName, 
+        string contentType, 
+        string uploadedBy, 
+        string? associatedWith,
+        string? associatedEntityType) // <- new parameter
     {
-        return await _files.Find(f => true).ToListAsync();
+        var options = new GridFSUploadOptions
+        {
+            Metadata = new BsonDocument
+            {
+                { "uploadedBy", uploadedBy },
+                { "associatedWith", associatedWith != null ? new BsonString(associatedWith) : BsonNull.Value },
+                { "associatedEntityType", associatedEntityType != null ? new BsonString(associatedEntityType) : BsonNull.Value },
+                { "originalName", fileName },
+                { "fileType", contentType },
+                { "createdAt", DateTime.UtcNow }
+            }
+        };
+
+        var fileId = await _gridFS.UploadFromStreamAsync(fileName, fileStream, options);
+
+        var fileResource = new FileResource
+        {
+            Id = fileId.ToString(),
+            OriginalName = fileName,
+            FileType = contentType,
+            FileSize = fileStream.Length,
+            UploadedBy = uploadedBy,
+            AssociatedWith = associatedWith,
+            AssociatedEntityType = associatedEntityType,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _files.InsertOneAsync(fileResource);
+
+
+        return fileResource.Id;
     }
 
+    public async Task<Stream?> DownloadFileAsync(string id)
+    {
+        if (!ObjectId.TryParse(id, out var objectId)) return null;
+
+        try
+        {
+            var memoryStream = new MemoryStream();
+            await _gridFS.DownloadToStreamAsync(objectId, memoryStream);
+            memoryStream.Position = 0;
+            return memoryStream;
+        }
+        catch (GridFSFileNotFoundException)
+        {
+            return null;
+        }
+    }
+    
     public async Task<FileResource?> GetFileByIdAsync(string id)
     {
         return await _files.Find(f => f.Id == id).FirstOrDefaultAsync();
     }
 
-    public async Task<FileResource> CreateFileAsync(FileResource file)
+    public async Task<bool> DeleteFileAsync(string id)
     {
-        file.CreatedAt = DateTime.UtcNow;
-        file.UpdatedAt = DateTime.UtcNow;
-        await _files.InsertOneAsync(file);
-        return file;
+        if (!ObjectId.TryParse(id, out var objectId)) return false;
+
+        await _gridFS.DeleteAsync(objectId);
+        var result = await _files.DeleteOneAsync(f => f.Id == id);
+        return result.DeletedCount > 0;
     }
 
     public async Task<bool> UpdateFileAsync(string id, FileResource updatedFile)
@@ -37,15 +106,20 @@ public class FileService
         return result.ModifiedCount > 0;
     }
 
-    public async Task<bool> DeleteFileAsync(string id)
-    {
-        var result = await _files.DeleteOneAsync(f => f.Id == id);
-        return result.DeletedCount > 0;
-    }
-
+    // ---------------- List / Filter ----------------
     public async Task<List<FileResource>> GetFilesByUploaderIdAsync(string userId)
     {
         return await _files.Find(f => f.UploadedBy == userId).ToListAsync();
+    }
+
+    public async Task<List<FileResource>> GetFilesByAssociatedEntityAsync(string associatedId, string associatedEntityType)
+    {
+        if (string.IsNullOrEmpty(associatedId) || string.IsNullOrEmpty(associatedEntityType))
+            return new List<FileResource>();
+
+        return await _files
+            .Find(f => f.AssociatedWith == associatedId && f.AssociatedEntityType == associatedEntityType)
+            .ToListAsync();
     }
 
     public async Task<List<FileResource>> GetFilesByAssociatedEntityIdAsync(string associatedId)
@@ -67,6 +141,7 @@ public class FileService
         return await _files.Find(f => true).Sort(sortDefinition).ToListAsync();
     }
 
+    // ---------------- Aggregates ----------------
     public async Task<List<UserFileCount>> GetFileCountPerUserAsync()
     {
         var pipeline = _files.Aggregate()
@@ -92,6 +167,7 @@ public class FileService
     }
 }
 
+// ---------------- Helper Classes ----------------
 public class UserFileCount
 {
     public string UserId { get; set; } = null!;

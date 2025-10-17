@@ -87,7 +87,7 @@ public class FormsController : ControllerBase
 
         if (form.Questions == null || !form.Questions.Any())
             return BadRequest("At least one question is required");
-
+        
 
         return Ok(updatedForm);
     }
@@ -107,6 +107,17 @@ public class FormsController : ControllerBase
 
         var deleted = await _formService.DeleteFormAsync(id);
         return deleted ? NoContent() : NotFound();
+    }
+    
+    [HttpGet("me")]
+    public async Task<ActionResult<List<Form>>> GetMyForms()
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+            return Unauthorized();
+
+        var forms = await _formService.GetUserFormsAsync(currentUserId);
+        return Ok(forms);
     }
 }
 

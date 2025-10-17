@@ -35,7 +35,7 @@ public class AuthController : ControllerBase
                 Email = request.Email,
                 PasswordHash = request.Password, 
                 Name = string.IsNullOrWhiteSpace(request.Name) ? request.Email.Split('@')[0] : request.Name,
-                AvatarUrl = "default-avatar.png",
+                AvatarUrl = null,
                 Role = "user",
                 IsActive = true,
                 Preferences = new UserPreferences(),
@@ -53,6 +53,7 @@ public class AuthController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+    [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto request)
     {
