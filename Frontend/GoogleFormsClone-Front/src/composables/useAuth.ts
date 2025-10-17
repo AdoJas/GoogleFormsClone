@@ -8,7 +8,6 @@ export function useAuth() {
     const loading = ref(false)
     const error = ref<string | null>(null)
 
-    // Restore user from localStorage if exists
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
         user.value = JSON.parse(storedUser)

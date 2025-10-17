@@ -181,15 +181,13 @@ const handleAvatarSelected = async (event: Event) => {
   const oldFileId = currentUser.value.avatarUrl // store previous avatar ID
 
   try {
-    // 1️⃣ Upload new avatar
+
     const fileId = await fileApi.uploadAvatar(file, currentUser.value.id)
 
-    // 2️⃣ Update user record with new avatar
     await updateMe({ avatarUrl: fileId })
     currentUser.value = { ...currentUser.value, avatarUrl: fileId }
     localStorage.setItem('user', JSON.stringify(currentUser.value))
 
-    // 3️⃣ Delete old avatar if it exists
     if (oldFileId) {
       try {
         await fileApi.deleteFile(oldFileId)
@@ -198,7 +196,6 @@ const handleAvatarSelected = async (event: Event) => {
       }
     }
 
-    // 4️⃣ Update preview instantly
     if (previousBlobUrl) URL.revokeObjectURL(previousBlobUrl)
     avatarBlobUrl.value = URL.createObjectURL(file)
     previousBlobUrl = avatarBlobUrl.value

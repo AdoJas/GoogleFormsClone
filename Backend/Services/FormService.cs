@@ -60,7 +60,6 @@ namespace GoogleFormsClone.Services
             if (form.Questions == null || !form.Questions.Any())
                 return;
 
-            // 1️⃣ Build a mapping of temporary/local IDs → new ObjectIds
             var idMap = new Dictionary<string, string>();
 
             foreach (var question in form.Questions)
@@ -69,12 +68,11 @@ namespace GoogleFormsClone.Services
                 {
                     var newId = ObjectId.GenerateNewId().ToString();
                     if (!string.IsNullOrEmpty(question.Id))
-                        idMap[question.Id] = newId; // remember temp ID
+                        idMap[question.Id] = newId; 
                     question.Id = newId;
                 }
             }
 
-            // 2️⃣ Assign ObjectIds to options
             foreach (var question in form.Questions)
             {
                 if (question.Options != null)
@@ -87,7 +85,6 @@ namespace GoogleFormsClone.Services
                 }
             }
 
-            // 3️⃣ Resolve logic dependencies using the map
             foreach (var question in form.Questions)
             {
                 if (question.Logic != null && !string.IsNullOrEmpty(question.Logic.DependsOn))
@@ -95,12 +92,10 @@ namespace GoogleFormsClone.Services
                     var dependsOn = question.Logic.DependsOn;
                     if (idMap.ContainsKey(dependsOn))
                     {
-                        // Replace temp ID with the new ObjectId
                         question.Logic.DependsOn = idMap[dependsOn];
                     }
                     else if (!ObjectId.TryParse(dependsOn, out _))
                     {
-                        // Fallback: assign a new ObjectId only if no mapping found
                         question.Logic.DependsOn = ObjectId.GenerateNewId().ToString();
                     }
                 }

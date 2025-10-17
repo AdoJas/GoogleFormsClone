@@ -4,14 +4,11 @@ import router from './router'
 import 'vuetify/styles'
 import './style.css'
 
-// Material Design Icons
 import '@mdi/font/css/materialdesignicons.css'
 
-// Vuetify
 import { createVuetify } from 'vuetify'
 import { aliases, mdi } from 'vuetify/iconsets/mdi'
 
-// Import all components & directives (recommended)
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
@@ -54,7 +51,6 @@ const vuetify = createVuetify({
     },
 })
 
-// Create and mount app
 createApp(App)
     .use(router)
     .use(vuetify)
