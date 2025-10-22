@@ -10,7 +10,7 @@ public class FileService
 {
     private readonly IMongoCollection<FileResource> _files;
     private readonly GridFSBucket _gridFS;
-	private readonly UserService _userService;
+    private readonly UserService _userService;
 
     public FileService(MongoDbService db, UserService userService)
     {
