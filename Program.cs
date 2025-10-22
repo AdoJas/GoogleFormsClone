@@ -22,6 +22,9 @@ builder.Services.Configure<MongoDbSettings>(
 builder.Services.Configure<JwtSettings>(
     builder.Configuration.GetSection("JwtSettings"));
 
+builder.Services.AddSingleton<RedisService>();
+
+
 //
 // ──────────────────────────────────────────────────────────────
 //  2. MONGODB CLIENT SETUP
