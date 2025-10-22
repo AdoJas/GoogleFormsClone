@@ -180,7 +180,7 @@ public class QuestionLogic
 {
     [BsonElement("dependsOn")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string DependsOn { get; set; } = null!;
+    public string? DependsOn { get; set; }
 
     [BsonElement("condition")]
     public string Condition { get; set; } = string.Empty;
