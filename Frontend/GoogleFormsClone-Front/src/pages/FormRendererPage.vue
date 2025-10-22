@@ -132,7 +132,7 @@ const submitForm = async () => {
         questionId: q.id,
         answerText: ['text','textarea'].includes(q.type) ? val : null,
         selectedOptions: q.type === 'checkbox' ? val : null,
-        linearScaleValue: q.type === 'linear-scale' ? val : null, // note dash
+        linearScaleValue: q.type === 'linearscale' ? val : null, // match normalized type
         questionSnapshot: {
           questionText: q.label,
           questionType: q.type,
