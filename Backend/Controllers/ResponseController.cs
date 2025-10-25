@@ -1,156 +1,158 @@
-﻿using GoogleFormsClone.Models;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using GoogleFormsClone.Services;
-using Microsoft.AspNetCore.Mvc;
-using GoogleFormsClone.DTOs.Response;
 using System.Security.Claims;
-using MongoDB.Driver;
+using GoogleFormsClone.DTOs.Response;
+using GoogleFormsClone.Mappers;
+using GoogleFormsClone.Models;
+using GoogleFormsClone.Services;
 
-
-namespace GoogleFormsClone.Controllers;
-
-[ApiController]
-[Route("api/response")]
-public class ResponseController : ControllerBase
+namespace GoogleFormsClone.Controllers
 {
-    private readonly ResponseService _responseService;
-    private readonly IFormService _formService;
-
-    public ResponseController(ResponseService responseService, IFormService formService)
+    [ApiController]
+    [Route("api/responses")]
+    [Authorize]
+    public class ResponsesController : ControllerBase
     {
-        _responseService = responseService;
-        _formService = formService;
-    }
+        private readonly ResponseService _responseService;
+        private readonly IFormService _formService;
 
-    [HttpGet("{formId}/responses")]
-    public async Task<IActionResult> GetResponsesByForm(string formId)
-    {
-        var form = await _formService.GetFormAsync(formId);
-        if (form == null)
-            return NotFound("Form not found");
-
-        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
-
-        if (currentUserRole != "Admin" && form.CreatedBy != currentUserId)
-            return Forbid("You are not allowed to view these responses");
-
-        var responses = await _responseService.GetByResponseFormIdAsync(formId);
-        return Ok(responses);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetResponseById(string id)
-    {
-        var response = await _responseService.GetResponseByIdAsync(id);
-        if (response == null)
-            return NotFound(new { error = "Response not found." });
-        
-        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
-
-        var form = await _formService.GetFormAsync(response.FormId);
-        var formOwnerId = form?.CreatedBy;
-
-        if (currentUserRole != "Admin" && currentUserId != response.SubmittedBy && currentUserId != formOwnerId)
-            return Forbid("You are not allowed to view this response.");
-
-        return Ok(response);
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> CreateResponse([FromBody] CreateResponseDto dto)
-    {
-        if (dto == null || string.IsNullOrEmpty(dto.FormId))
-            return BadRequest("FormId is required.");
-
-        var form = await _formService.GetFormAsync(dto.FormId);
-        if (form == null)
-            return NotFound("Form not found.");
-
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        if (form.Settings.OneResponsePerUser)
+        public ResponsesController(ResponseService responseService, IFormService formService)
         {
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized("User ID not found.");
-            var existingResponses = await _responseService.GetByResponseFormIdAsync(dto.FormId);
-            if (existingResponses.Any(r => r.SubmittedBy == userId))
-                return BadRequest("You have already submitted a response to this form.");
+            _responseService = responseService;
+            _formService = formService;
         }
 
-        foreach (var answer in dto.Answers)
+        [HttpGet("/forms/{formId}/responses")]
+        public async Task<IActionResult> GetResponsesByForm(string formId)
         {
-            var question = form.Questions.FirstOrDefault(q => q.Id == answer.QuestionId);
-            if (question == null)
-                return BadRequest($"Question {answer.QuestionId} does not exist.");
+            var form = await _formService.GetFormAsync(formId);
+            if (form == null) return NotFound("Form not found");
 
-            switch (question.Type)
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+            if (currentUserRole != "Admin" && form.CreatedBy != currentUserId)
+                return Forbid("You are not allowed to view these responses");
+
+            var responses = await _responseService.GetByResponseFormIdAsync(formId);
+            return Ok(responses);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetResponseById(string id)
+        {
+            var response = await _responseService.GetResponseByIdAsync(id);
+            if (response == null)
+                return NotFound(new { error = "Response not found." });
+
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var currentUserRole = User.FindFirstValue(ClaimTypes.Role);
+
+            var form = await _formService.GetFormAsync(response.FormId);
+            if (form == null) return NotFound("Parent form not found");
+
+            if (currentUserRole != "Admin" && currentUserId != response.SubmittedBy && form.CreatedBy != currentUserId)
+                return Forbid("You are not allowed to view this response.");
+
+            return Ok(response);
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> CreateResponse([FromBody] CreateResponseDto dto)
+        {
+            if (dto == null || string.IsNullOrEmpty(dto.FormId))
+                return BadRequest("FormId is required.");
+
+            var form = await _formService.GetFormAsync(dto.FormId);
+            if (form == null)
+                return NotFound("Form not found.");
+            if (!form.AccessControl.IsPublic)
             {
-                case "text":
-                    if (question.Required && string.IsNullOrEmpty(answer.Value))
-                        return BadRequest($"Answer required for question {question.Id}.");
-                    if (question.Validation != null)
-                    {
-                        if (answer.Value?.Length < question.Validation.MinLength)
-                            return BadRequest($"Answer too short for question {question.Id}.");
-                        if (answer.Value?.Length > question.Validation.MaxLength)
-                            return BadRequest($"Answer too long for question {question.Id}.");
-                    }
-                    break;
-
-                case "multiple-choice":
-                    if (question.Required)
-                    {
-                        if (question.AllowMultipleSelection == false)
-                        {
-                            if (string.IsNullOrEmpty(answer.Value))
-                            {
-                                return BadRequest($"Answer required for question {question.Id}.");
-                            }
-                            else if (answer.SelectedOptions != null && answer.SelectedOptions.Count > 1)
-                            {
-                                return BadRequest($"Only one choice allowed for question {question.Id}.");
-                            }
-                            if (!question.Options.Any(o => o.Text == answer.Value))
-                                return BadRequest($"Invalid option selected for question {question.Id}.");
-                        }
-                        else
-                        {
-                            if (answer.SelectedOptions != null && answer.SelectedOptions.Count == 0)
-                                return BadRequest($"Answer required for question {question.Id}.");
-
-                            if (answer.SelectedOptions != null && !answer.SelectedOptions.All(o => question.Options.Any(qo => qo.Text == o)))
-                                return BadRequest($"Invalid option selected for question {question.Id}.");
-
-                        }
-
-                    }
-                    break;
-
-                case "linear-scale":
-                    if (question.Required && !answer.LinearScaleValue.HasValue)
-                        return BadRequest($"Linear scale value required for question {question.Id}.");
-                    if (answer.LinearScaleValue.HasValue && question.LinearScale != null
-                        && (answer.LinearScaleValue < question.LinearScale.MinValue || answer.LinearScaleValue > question.LinearScale.MaxValue))
-                        return BadRequest($"Linear scale value out of range for question {question.Id}.");
-                    break;
-                case "File upload":
-                    if (question.Required && (answer.FileUpload == null || answer.FileUpload.Length == 0))
-                        return BadRequest($"File upload required for question {question.Id}.");
-                    break;
-                default:
-                    return BadRequest($"Unsupported question type {question.Type} for question {question.Id}.");
-            }
-        }
-            if (string.IsNullOrEmpty(userId))
+                if (form.AccessControl.RequirePassword)
                 {
-                    return Unauthorized("User ID not found.");
-                }
+                    var providedPassword = Request.Headers["Form-Password"].ToString();
 
-            var response = ResponseMapper.ToModel(dto, userId);
+                    if (string.IsNullOrEmpty(providedPassword))
+                        return Unauthorized("Password is required to submit this form.");
+
+                    if (form.AccessControl.AccessPassword != providedPassword)
+                        return Unauthorized("Invalid form password.");
+                }
+                else
+                {
+                    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (string.IsNullOrEmpty(currentUserId))
+                        return Forbid("This form is private and can only be accessed by its owner.");
+                }
+            }
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var ua = Request.Headers["User-Agent"].ToString();
+            var referrer = Request.Headers["Referer"].ToString() ?? "unknown";
+
+            if (form.Settings.OneResponsePerUser && userId != "anonymous")
+            {
+                var existing = await _responseService.GetByResponseFormIdAsync(dto.FormId);
+                if (existing.Any(r => r.SubmittedBy == userId))
+                    return BadRequest("You have already submitted a response to this form.");
+            }
+
+            var response = ResponseMapper.ToModel(dto, userId, form);
+
+            response.Metadata.IpAddress = ip;
+            response.Metadata.UserAgent = ua;
+            response.Metadata.Referrer = referrer;
+
             var created = await _responseService.CreateResponseAsync(response);
 
             return CreatedAtAction(nameof(GetResponseById), new { id = created.Id }, created);
         }
+
+
+        // -------- Helpers ----------
+        private static string? ValidateAnswer(Question q, AnswerDto dto)
+        {
+            var type = (dto.Type ?? q.Type ?? string.Empty).Trim().ToLowerInvariant();
+
+            switch (type)
+            {
+                case "text":
+                    if (q.Required && string.IsNullOrWhiteSpace(dto.Response.Text))
+                        return $"Answer required for question {q.Id}.";
+                    return null;
+
+                case "multiple-choice":
+                case "checkbox":
+                    var options = q.Options.Select(o => o.Text).ToHashSet();
+                    var selected = dto.Response.SelectedOptions ?? new List<string>();
+                    if (q.Required && selected.Count == 0)
+                        return $"Answer required for question {q.Id}.";
+                    if (!selected.All(options.Contains))
+                        return $"Invalid option selected for question {q.Id}.";
+                    return null;
+
+                case "linear-scale":
+                    if (q.Required && !dto.Response.LinearScaleValue.HasValue)
+                        return $"Linear scale value required for question {q.Id}.";
+                    if (dto.Response.LinearScaleValue.HasValue && q.LinearScale != null)
+                    {
+                        var v = dto.Response.LinearScaleValue.Value;
+                        if (v < q.LinearScale.MinValue || v > q.LinearScale.MaxValue)
+                            return $"Linear scale value out of range for question {q.Id}.";
+                    }
+                    return null;
+
+                case "file-upload":
+                    var ids = dto.Response.FileIds ?? new List<string>();
+                    if (q.Required && ids.Count == 0)
+                        return $"File upload required for question {q.Id}.";
+                    return null;
+
+                default:
+                    return $"Unsupported question type {type} for question {q.Id}.";
+            }
+        }
+    }
 }

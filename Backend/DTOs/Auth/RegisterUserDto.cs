@@ -1,4 +1,4 @@
-﻿namespace GoogleFormsClone.DTOs;
+﻿namespace GoogleFormsClone.DTOs.Auth;
 
 public class RegisterUserDto
 {

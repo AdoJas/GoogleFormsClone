@@ -1,5 +1,6 @@
 ﻿namespace GoogleFormsClone.DTOs.File;
 using System.ComponentModel.DataAnnotations;
+using GoogleFormsClone.DTOs.Forms;
 
 public class CreateFileDto
 {
@@ -45,4 +46,13 @@ public class UserStorageUsage
 {
     public string UserId { get; set; } = null!;
     public long TotalStorage { get; set; }
+}
+
+public class FileAttachmentDto
+{
+    public string? Id { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string MimeType { get; set; } = string.Empty;
+    public string FileUrl { get; set; } = string.Empty;
+    public long? FileSize { get; set; }
 }

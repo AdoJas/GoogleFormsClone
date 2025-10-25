@@ -15,19 +15,18 @@ public class FileResource
     public string FileType { get; set; } = string.Empty;
 
     [BsonElement("fileSize")]
-    public long FileSize { get; set; } = 0;
+    public long FileSize { get; set; }
 
     [BsonRepresentation(BsonType.ObjectId)]
     [BsonElement("uploadedBy")]
     public string UploadedBy { get; set; } = string.Empty;
 
-    [BsonRepresentation(BsonType.ObjectId)]
     [BsonElement("associatedWith")]
-    public string? AssociatedWith { get; set; } // Entity ID
+    public string AssociatedWith { get; set; } = string.Empty;
 
     [BsonElement("associatedEntityType")]
-    [BsonIgnoreIfNull]
-    public string? AssociatedEntityType { get; set; } // "Form", "Question", "User" for assigning in frontend
+    public string AssociatedEntityType { get; set; } = string.Empty;
+
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
@@ -39,4 +38,3 @@ public class FileResource
     [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
-

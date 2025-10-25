@@ -60,25 +60,23 @@ public class ResponseMetadata
 public class Answer
 {
     [BsonElement("questionId")]
-    [BsonRepresentation(BsonType.ObjectId)]
     public string QuestionId { get; set; } = string.Empty;
-
+    
     [BsonElement("answerText")]
     public string? AnswerText { get; set; }
-
+    
     [BsonElement("selectedOptions")]
     public List<string>? SelectedOptions { get; set; }
-
+    
     [BsonElement("linearScaleValue")]
     public int? LinearScaleValue { get; set; }
-
+    
     [BsonElement("fileUpload")]
     public FileUpload? FileUpload { get; set; }
-
+    
     [BsonElement("questionSnapshot")]
     public QuestionSnapshot QuestionSnapshot { get; set; } = new();
 }
-
 public class FileUpload
 {
     [BsonElement("fileUrl")]

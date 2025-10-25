@@ -9,8 +9,8 @@ public class Form
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = null!;
 
-    [BsonElement("createdBy")]
     [BsonRepresentation(BsonType.ObjectId)]
+    [BsonElement("createdBy")]
     public string CreatedBy { get; set; } = null!;
 
     [BsonElement("title")]
@@ -18,15 +18,18 @@ public class Form
 
     [BsonElement("description")]
     public string Description { get; set; } = string.Empty;
+    
+    [BsonElement("headerImageId")]
+    public string? HeaderImageId { get; set; }
 
     [BsonElement("settings")]
     public FormSettings Settings { get; set; } = new();
 
-    [BsonElement("isActive")]
-    public bool IsActive { get; set; } = true;
-
     [BsonElement("accessControl")]
     public AccessControl AccessControl { get; set; } = new();
+
+    [BsonElement("isActive")]
+    public bool IsActive { get; set; } = true;
 
     [BsonElement("version")]
     public int Version { get; set; } = 1;
@@ -45,45 +48,43 @@ public class Form
 
 public class FormSettings
 {
-    [BsonElement("allowEditing")]
-    public bool AllowEditing { get; set; } = false;
+    [BsonElement("showProgress")]
+    public bool ShowProgress { get; set; }
+
+    [BsonElement("collectEmails")]
+    public bool CollectEmails { get; set; }
 
     [BsonElement("oneResponsePerUser")]
-    public bool OneResponsePerUser { get; set; } = false;
+    public bool OneResponsePerUser { get; set; }
 
-    [BsonElement("showProgress")]
-    public bool ShowProgress { get; set; } = false;
+    [BsonElement("allowResponseEditing")]
+    public bool AllowResponseEditing { get; set; }
+
+    [BsonElement("responseEditingDuration")]
+    public int ResponseEditingDuration { get; set; }
 
     [BsonElement("confirmationMessage")]
     public string ConfirmationMessage { get; set; } = string.Empty;
-
-    [BsonElement("collectEmails")]
-    public bool CollectEmails { get; set; } = false;
-
-    [BsonElement("allowResponseEditing")]
-    public bool AllowResponseEditing { get; set; } = false;
-
-    [BsonElement("responseEditingDuration")]
-    public int ResponseEditingDuration { get; set; } = 0;
 }
 
 public class AccessControl
 {
     [BsonElement("isPublic")]
-    public bool IsPublic { get; set; } = false;
+    public bool IsPublic { get; set; }
 
     [BsonElement("requirePassword")]
-    public bool RequirePassword { get; set; } = false;
+    public bool RequirePassword { get; set; }
 
     [BsonElement("accessPassword")]
     public string AccessPassword { get; set; } = string.Empty;
 }
 
+[BsonNoId]
+[BsonIgnoreExtraElements]
 public class Question
 {
     [BsonElement("id")]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = null!;
+    public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [BsonElement("type")]
     public string Type { get; set; } = string.Empty;
@@ -92,16 +93,16 @@ public class Question
     public string QuestionText { get; set; } = string.Empty;
 
     [BsonElement("description")]
-    public string Description { get; set; } = string.Empty;
+    public string? Description { get; set; }
 
     [BsonElement("required")]
-    public bool Required { get; set; } = false;
+    public bool Required { get; set; }
 
     [BsonElement("allowMultipleSelection")]
-    public bool AllowMultipleSelection { get; set; } = true;
+    public bool AllowMultipleSelection { get; set; }
 
     [BsonElement("options")]
-    public List<QuestionOption> Options { get; set; } = new();
+    public List<QuestionOption>? Options { get; set; } = new();
 
     [BsonElement("linearScale")]
     public LinearScale? LinearScale { get; set; }
@@ -109,38 +110,45 @@ public class Question
     [BsonElement("validation")]
     public QuestionValidation? Validation { get; set; }
 
-    [BsonElement("orderIndex")]
-    public int OrderIndex { get; set; } = 0;
-
     [BsonElement("logic")]
     public QuestionLogic? Logic { get; set; }
 
     [BsonElement("appearance")]
     public QuestionAppearance? Appearance { get; set; }
+
+    [BsonElement("orderIndex")]
+    public int OrderIndex { get; set; }
+
+    [BsonIgnoreIfNull]
+    [BsonElement("attachment")]
+    public FileResource? Attachment { get; set; }
 }
 
+[BsonNoId]
+[BsonIgnoreExtraElements]
 public class QuestionOption
 {
     [BsonElement("id")]
+    [BsonRepresentation(BsonType.String)]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [BsonElement("text")]
     public string Text { get; set; } = string.Empty;
 
     [BsonElement("orderIndex")]
-    public int OrderIndex { get; set; } = 0;
+    public int OrderIndex { get; set; }
 
     [BsonElement("allowsCustomText")]
-    public bool AllowsCustomText { get; set; } = false;
+    public bool AllowsCustomText { get; set; }
 }
 
 public class LinearScale
 {
     [BsonElement("minValue")]
-    public int MinValue { get; set; } = 0;
+    public int MinValue { get; set; }
 
     [BsonElement("maxValue")]
-    public int MaxValue { get; set; } = 5;
+    public int MaxValue { get; set; }
 
     [BsonElement("minLabel")]
     public string MinLabel { get; set; } = string.Empty;
@@ -178,8 +186,8 @@ public class QuestionValidation
 
 public class QuestionLogic
 {
-    [BsonElement("dependsOn")]
     [BsonRepresentation(BsonType.ObjectId)]
+    [BsonElement("dependsOn")]
     public string? DependsOn { get; set; }
 
     [BsonElement("condition")]

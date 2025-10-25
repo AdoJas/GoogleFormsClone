@@ -15,6 +15,7 @@ public class FileController : ControllerBase
     private readonly FileService _fileService;
     private readonly UserService _userService;
 
+
     public FileController(FileService fileService, UserService userService)
     {
         _fileService = fileService;
@@ -35,6 +36,19 @@ public class FileController : ControllerBase
 
         try
         {
+            if (!string.IsNullOrEmpty(request.AssociatedWith) && !string.IsNullOrEmpty(request.AssociatedEntityType))
+            {
+                var existingFiles = await _fileService.GetFilesByAssociatedEntityAsync(
+                    request.AssociatedWith,
+                    request.AssociatedEntityType
+                );
+
+                foreach (var existing in existingFiles)
+                {
+                    await _fileService.DeleteFileAsync(existing.Id);
+                }
+            }
+
             using var stream = request.File.OpenReadStream();
 
             var fileId = await _fileService.UploadFileAsync(
@@ -55,10 +69,7 @@ public class FileController : ControllerBase
         }
     }
 
-    // -------------------
-    // Download a file
-    // -------------------
-    [HttpGet("{id}")]
+    [HttpGet("{id}/download")]
     [AllowAnonymous]
     public async Task<IActionResult> DownloadFile(string id)
     {
@@ -85,9 +96,6 @@ public class FileController : ControllerBase
         }
     }
 
-    // -------------------
-    // List files by uploader
-    // -------------------
     [HttpGet("uploader/{userId}")]
     public async Task<IActionResult> GetFilesByUploader(string userId)
     {
@@ -95,9 +103,6 @@ public class FileController : ControllerBase
         return Ok(files);
     }
 
-    // -------------------
-    // List files by associated entity
-    // -------------------
     [HttpGet("associated")]
     public async Task<IActionResult> GetFilesByAssociatedEntity([FromQuery] string associatedId, [FromQuery] string associatedEntityType)
     {
@@ -125,9 +130,6 @@ public class FileController : ControllerBase
         return Ok(result);
     }
 
-    // -------------------
-    // Update file metadata
-    // -------------------
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateFile(string id, [FromBody] UpdateFileDto dto)
     {
@@ -146,9 +148,6 @@ public class FileController : ControllerBase
         return updated ? NoContent() : StatusCode(500, "Failed to update file");
     }
 
-    // -------------------
-    // Delete a file
-    // -------------------
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteFile(string id)
     {

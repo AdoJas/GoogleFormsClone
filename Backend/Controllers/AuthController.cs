@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using GoogleFormsClone.Models;
 using GoogleFormsClone.Services;
-using GoogleFormsClone.DTOs;
 using GoogleFormsClone.DTOs.Auth;
 using Microsoft.AspNetCore.Authorization;
 
@@ -13,12 +12,14 @@ namespace GoogleFormsClone.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AuthService _authService;
+    private readonly IWebHostEnvironment _env;
 
-    public AuthController(AuthService authService)
+    public AuthController(AuthService authService, IWebHostEnvironment env)
     {
         _authService = authService;
+        _env = env;
     }
-    
+
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterUserDto request)
@@ -33,8 +34,10 @@ public class AuthController : ControllerBase
             var user = new User
             {
                 Email = request.Email,
-                PasswordHash = request.Password, 
-                Name = string.IsNullOrWhiteSpace(request.Name) ? request.Email.Split('@')[0] : request.Name,
+                PasswordHash = request.Password,
+                Name = string.IsNullOrWhiteSpace(request.Name)
+                    ? request.Email.Split('@')[0]
+                    : request.Name,
                 AvatarUrl = null,
                 Role = "user",
                 IsActive = true,
@@ -45,32 +48,15 @@ public class AuthController : ControllerBase
             };
 
             var authResponse = await _authService.RegisterAndLoginUserAsync(user);
-
-            return Ok(authResponse); 
+            SetAuthCookies(authResponse);
+            return Ok(new { user = authResponse.User });
         }
         catch (Exception ex)
         {
             return BadRequest(new { error = ex.Message });
         }
     }
-    [AllowAnonymous]
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto request)
-    {
-        var response = await _authService.RefreshTokenAsync(request.RefreshToken);
-        if (response == null)
-            return Unauthorized();
 
-        return Ok(response);
-    }
-    
-    [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromBody] RefreshRequestDto request)
-    {
-        await _authService.RevokeRefreshTokenAsync(request.RefreshToken);
-        return Ok();
-    }
-    
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] AuthRequest request)
@@ -79,6 +65,71 @@ public class AuthController : ControllerBase
         if (response == null)
             return Unauthorized(new { error = "Invalid credentials." });
 
-        return Ok(response);
+        SetAuthCookies(response);
+        return Ok(new { user = response.User });
     }
+
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh()
+    {
+        if (!Request.Cookies.TryGetValue("refreshToken", out var token))
+            return Unauthorized();
+
+        var response = await _authService.RefreshTokenAsync(token);
+        if (response == null)
+            return Unauthorized();
+
+        SetAuthCookies(response);
+        return Ok(new { user = response.User });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        if (Request.Cookies.TryGetValue("refreshToken", out var token))
+            await _authService.RevokeRefreshTokenAsync(token);
+
+        ClearAuthCookies();
+        return Ok();
+    }
+
+    private void SetAuthCookies(AuthResponse response)
+	{
+    	bool isDev = _env.IsDevelopment();
+
+    	var accessOptions = new CookieOptions
+    	{
+        	HttpOnly = true,
+        	Secure = true, 
+        	SameSite = SameSiteMode.None, 
+        	Expires = DateTime.UtcNow.AddMinutes(30),
+        	Path = "/"
+    	};
+
+    	var refreshOptions = new CookieOptions
+    	{
+        	HttpOnly = true,
+        	Secure = true,
+        	SameSite = SameSiteMode.None,
+        	Expires = DateTime.UtcNow.AddDays(7),
+        	Path = "/"
+    	};
+
+    	Response.Cookies.Append("accessToken", response.AccessToken, accessOptions);
+    	Response.Cookies.Append("refreshToken", response.RefreshToken, refreshOptions);
+	}
+
+    private void ClearAuthCookies()
+	{
+    	var options = new CookieOptions
+    	{
+        	Path = "/",
+        	Secure = true,
+        	SameSite = SameSiteMode.None
+    	};
+
+    	Response.Cookies.Delete("accessToken", options);
+    	Response.Cookies.Delete("refreshToken", options);
+	}
 }

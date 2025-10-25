@@ -22,17 +22,17 @@ public class FileService
             WriteConcern = WriteConcern.WMajority,
             ReadPreference = ReadPreference.Primary
         });
-		_userService = userService;
+        _userService = userService;
     }
 
-    // ---------------- Upload/Download ----------------
+    // ---------------- Core CRUD ----------------
     public async Task<string> UploadFileAsync(
         Stream fileStream, 
         string fileName, 
         string contentType, 
         string uploadedBy, 
         string? associatedWith,
-        string? associatedEntityType) // <- new parameter
+        string? associatedEntityType) 
     {
         var options = new GridFSUploadOptions
         {
@@ -63,8 +63,6 @@ public class FileService
         };
 
         await _files.InsertOneAsync(fileResource);
-
-
         return fileResource.Id;
     }
 
@@ -164,6 +162,39 @@ public class FileService
             });
 
         return await pipeline.ToListAsync();
+    }
+
+    // ---------------- Form-Level Operations ----------------
+    public async Task<List<FileResource>> GetFilesByFormAndQuestionsAsync(Form form)
+    {
+        var questionIds = form.Questions.Select(q => q.Id).ToList();
+        return await _files.Find(f =>
+            f.AssociatedWith == form.Id || questionIds.Contains(f.AssociatedWith)
+        ).ToListAsync();
+    }
+
+    public async Task DeleteFilesByFormAsync(Form form)
+    {
+        await _files.DeleteManyAsync(f =>
+            f.AssociatedWith == form.Id &&
+            f.AssociatedEntityType == "Form");
+
+        var questionIds = form.Questions.Select(q => q.Id).ToList();
+        if (questionIds.Any())
+        {
+            await _files.DeleteManyAsync(f =>
+                questionIds.Contains(f.AssociatedWith) &&
+                f.AssociatedEntityType == "Question");
+        }
+    }
+
+    public async Task<List<FileResource>> GetFilesByAssociatedWithAsync(string formId)
+    {
+        return await _files.Find(f =>
+            f.AssociatedWith == formId ||
+            f.AssociatedEntityType == "FormHeader" ||
+            f.AssociatedEntityType == "QuestionAttachment"
+        ).ToListAsync();
     }
 }
 
